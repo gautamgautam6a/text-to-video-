@@ -22,35 +22,45 @@ llm = ChatGoogleGenerativeAI(
 researcher_prompt = PromptTemplate(
     input_variables=["topic"],
     template=(
-        "You are a researcher. Find the latest information on {topic} "
-        "from reliable sources and provide 10 concise bullet points."
+        f"You are a researcher.\n\
+        Find the latest, most credible information about {{topic}} from reliable and up-to-date sources.\n\
+        Return 10 concise, insight-driven bullet points that reflect the current state of the topic — with emphasis on:\n\
+        - Hidden costs buyers or teams are silently tolerating\n\
+        - Risks of inaction or delay (emotional, business, strategic)\n\
+        - Blind spots the average decision-maker might miss\n\
+        - Emerging trends or shifts in behavior, tech, or market expectations\n\
+        - Unspoken challenges that could derail progress\n\
+        \n\
+        🧠 Each bullet should read like a wake-up call, not a Wikipedia fact.\n\
+        🎯 Focus on framing problems in a way that creates urgency, discomfort, or FOMO.\n\
+        ❌ Avoid fluff, generalities, or jargon — every bullet must deliver clarity or provoke reflection.\n\
+        \n\
+        At the end, include a 1-sentence insight summary that ties the key takeaway to buyer-level consequences."
     ),
 )
 
 script_prompt = PromptTemplate(
     input_variables=["topic", "research"],
     template=(
-        f"Write a 30-second faceless video script about {{topic}}.\
+        f"Based on this research:\n{{research}}\n\nWrite a 30-second faceless video script about {{topic}}.\
         Use the following formatting structure and creative rules:\
         Scene formatting:\
-        (Scene: [Brief but vivid description of visual footage — eg. ‘a dimly lit office’, ‘fast-cut startup b-roll’, ‘typing hands on keyboard’, etc.])\
-        (0–5 seconds): [Narration text begins here — should immediately hook attention, make a bold claim, ask a sharp question, or state a provocative insight.]\
-        (6–30 seconds): Continue with timestamped narration, roughly breaking the script into 10–20 second chunks. Use each segment to unfold the story or argument in layers.\
+        (Scene: [Brief but vivid description of visual footage — eg. 'a dimly lit office', 'fast-cut startup b-roll', 'typing hands on keyboard', etc.])\
+        (0–5 seconds): [Narration text begins here — should immediately hook attention by highlighting one of the key risks or hidden costs from the research.]\
+        (6–30 seconds): Continue with timestamped narration, roughly breaking the script into 10–20 second chunks. Weave in insights from the research to build tension and urgency.\
         Narration tone + pacing:\
         • Conversational but cinematic — like a sharp documentary voiceover.\
-        • No jargon. No clichés. Speak like a smart peer who’s seen things.\
+        • No jargon. No clichés. Speak like a smart peer who's seen things.\
         • Short, punchy lines that land hard.\
         • Vary emotional tone: tension → clarity → momentum → payoff.\
         Creative Direction:\
-        ✅ Start with a strong emotional or intellectual hook — pull the viewer into a question, crisis, or uncomfortable truth.\
+        ✅ Start with a strong emotional or intellectual hook — use one of the wake-up call points from the research.\
         ✅ Use visual metaphors and sensory details that can be represented easily by stock or animated footage.\
-        ✅ Stack consequences — show ripple effects across business, personal, or social levels.\
-        ✅ Don’t just describe — reframe the problem. Help the viewer “see the invisible.”\
-        ✅ End with a clear insight, memorable one-liner, or direct CTA that sticks in their head.\
+        ✅ Stack consequences — incorporate the blind spots and unspoken challenges from the research.\
+        ✅ Don't just describe — reframe the problem using the emerging trends and insights provided.\
+        ✅ End with a clear insight from the research summary, turned into a memorable one-liner or CTA.\
         Call to Action (CTA):\
-        The ending CTA should feel like a realization, not a pitch.\
-        E.g., “So the real question is… what’s the cost of waiting?”\
-        or “Your move. Stay where you are — or build what others won’t.”\
+        The ending CTA should feel like a realization based on the key research insight.\
         Video Length Guidance:\
         • Target: 30 seconds\
         • Use line breaks and timestamps to control pacing and visual flow"
