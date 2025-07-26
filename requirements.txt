@@ -1,13 +1,19 @@
-# Text-to-Speech
-TTS>=0.15.0
-torch>=2.0.0
-torchaudio>=2.0.0
-numpy>=1.22.0
-
-# LangChain and Google AI
-langchain-google-genai>=0.0.5
+# AI and Machine Learning
 langchain>=0.1.0
+langchain-google-genai>=0.0.5
+openai-whisper>=20231117
 
-# Environment and utilities
+# Audio and Speech
+elevenlabs>=0.3.0
+
+# Video Processing
+moviepy>=1.0.3
+
+# Environment and Utilities
 python-dotenv>=0.19.0
 pathlib>=1.0.1
+requests>=2.31.0
+typing>=3.7.4
+
+# Optional: Automatic dependency (if needed)
+typing-extensions>=4.5.0
