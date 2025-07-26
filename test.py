@@ -275,7 +275,7 @@ def create_subtitle_clips(subtitle_segments: List[Dict], video_size: tuple):
         # Create text clip with professional styling using new MoviePy syntax
         txt_clip = TextClip(
             text=segment["text"],
-            font_size=35,        # Large, readable font
+            font_size=25,        # Large, readable font
             color='white',       # White text
             stroke_color='black', # Black outline
             stroke_width=2       # Thick outline for contrast
