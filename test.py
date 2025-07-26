@@ -1,7 +1,9 @@
 import os
 import re
 import json
+import requests
 from pathlib import Path
+from typing import List, Dict, Optional
 from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.prompts import PromptTemplate
@@ -9,24 +11,47 @@ from elevenlabs import generate, set_api_key
 
 # Load environment variables
 load_dotenv()
+
+# =============================================================================
+# CONFIGURATION & SETUP
+# =============================================================================
+
+def validate_setup():
+    print("🔍 Validating setup...")
+    required_keys = ["GEMINI_API_KEY", "ELEVENLABS_API_KEY", "PEXELS_API_KEY"]
+    missing = [k for k in required_keys if not os.getenv(k)]
+    for k in required_keys:
+        if os.getenv(k):
+            print(f"✅ {k} found")
+    if missing:
+        print(f"❌ Missing API keys: {', '.join(missing)}")
+        return False
+    try:
+        import moviepy
+        print("✅ MoviePy available")
+        return True
+    except ImportError:
+        print("⚠️ MoviePy not found")
+        return False
+
 google_api_key = os.getenv("GEMINI_API_KEY")
 eleven_api = os.getenv("ELEVENLABS_API_KEY")
+pexels_api_key = os.getenv("PEXELS_API_KEY")
 
-if not google_api_key:
-    raise ValueError("GEMINI_API_KEY not found in .env")
-if not eleven_api:
-    raise ValueError("ELEVENLABS_API_KEY not found in .env")
+if not all([google_api_key, eleven_api, pexels_api_key]):
+    if not validate_setup():
+        exit(1)
 
-# Initialize clients
 llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash", temperature=0.7, google_api_key=google_api_key
+    model="gemini-2.5-flash",
+    temperature=0.7,
+    google_api_key=google_api_key
 )
 set_api_key(eleven_api)
 
-# Common ElevenLabs voice IDs
 VOICE_IDS = {
     "rachel": "21m00Tcm4TlvDq8ikWAM",
-    "domi": "AZnzlk1XvdvUeBnXmlld", 
+    "domi": "AZnzlk1XvdvUeBnXmlld",
     "bella": "EXAVITQu4vr4xnSDxMaL",
     "antoni": "ErXwobaYiN019PkySvjV",
     "elli": "MF3mGyEYCl7XYWbV9V6O",
@@ -36,29 +61,18 @@ VOICE_IDS = {
     "sam": "yoZ06aMxZJJ28mfd3POQ"
 }
 
-def get_voice_id(voice_name: str) -> str:
-    """Get voice ID from name, with fallback to Rachel"""
-    return VOICE_IDS.get(voice_name.lower(), VOICE_IDS["rachel"])
+def get_voice_id(name: str):
+    return VOICE_IDS.get(name.lower(), VOICE_IDS["rachel"])
 
-# Prompts
+# =============================================================================
+# CONTENT GENERATION
+# =============================================================================
+
 researcher_prompt = PromptTemplate(
     input_variables=["topic"],
     template=(
-        "You are an expert researcher specializing in business intelligence and market analysis.\n"
-        "Research the topic: {topic}\n\n"
-        "Provide 10 research-backed insights focusing on:\n"
-        "• Hidden costs and overlooked expenses\n"
-        "• Critical risks of delayed action\n"
-        "• Common blind spots in decision-making\n"
-        "• Emerging industry trends and disruptions\n"
-        "• Unspoken operational challenges\n"
-        "• Competitive advantages being missed\n"
-        "• Resource allocation inefficiencies\n"
-        "• Customer behavior shifts\n"
-        "• Technology impact and automation threats\n"
-        "• Market timing considerations\n\n"
-        "Format each insight as an actionable bullet point with specific examples when possible.\n"
-        "End with a compelling 1-sentence summary highlighting the most critical business consequence."
+        "Research the topic: {topic}\nProvide 10 research insights in bullet points with examples.\n"
+        "End with a 1-sentence summary."
     ),
 )
 
@@ -66,298 +80,170 @@ script_prompt = PromptTemplate(
     input_variables=["topic", "research"],
     template=(
         "Based on this research:\n{research}\n\n"
-        "Create a compelling 30-second video script for: {topic}\n\n"
-        "STRUCTURE (follow exactly):\n"
-        "(0-5 seconds): Start with a shocking statistic, question, or contrarian statement\n"
-        "(6-15 seconds): Build urgency with hidden costs, risks, or missed opportunities\n"
-        "(16-25 seconds): Reveal the solution, trend, or strategic advantage\n"
-        "(26-30 seconds): End with a memorable call-to-action or thought-provoking statement\n\n"
-        "STYLE REQUIREMENTS:\n"
-        "✓ Conversational yet authoritative tone\n"
-        "✓ Short, punchy sentences (max 12 words each)\n"
-        "✓ Specific numbers and data points when available\n"
-        "✓ Emotional progression: surprise → concern → clarity → action\n"
-        "✓ Avoid jargon, buzzwords, and generic statements\n"
-        "✓ Include natural pauses with [...] for dramatic effect\n"
-        "✓ Do NOT include section labels like 'HOOK', 'TENSION' etc.\n\n"
-        "Output ONLY the timestamped narration text that will be spoken."
+        "Write a 30-second script for: {topic}\n"
+        "Output must be exactly in this format:\n"
+        "(0-5 seconds): ...\n(6-15 seconds): ...\n(16-25 seconds): ...\n(26-30 seconds): ...\n"
+        "Short, punchy sentences, no extra labels, only narration."
     ),
 )
 
-# Step 1: Research
-def researcher(topic: str, out_file="research.md"):
-    """Generate comprehensive research on the given topic."""
+def research_topic(topic: str, out_file: str) -> str:
     print(f"🔍 Researching: {topic}")
-    
-    research = llm.invoke(researcher_prompt.format(topic=topic))
-    content = getattr(research, "content", str(research))
-    
-    if not content.strip():
-        raise ValueError("Research generation failed: Empty output")
-    
+    response = llm.invoke(researcher_prompt.format(topic=topic))
+    content = getattr(response, "content", str(response))
     Path(out_file).write_text(content, encoding="utf-8")
     print(f"✅ Research saved to: {out_file}")
     return content
 
-def clean_script_content(content: str) -> str:
-    """Clean script content by removing section headers and keeping only narration."""
-    lines = content.split('\n')
-    cleaned_lines = []
-    
-    for line in lines:
-        line = line.strip()
-        # Keep timestamp lines and narration, skip section headers
-        if line.startswith('(') or (line and not line.isupper() and not line.endswith(':')):
-            cleaned_lines.append(line)
-    
-    return '\n'.join(cleaned_lines)
-
-# Step 2: Script Generation
-def generate_script(topic: str, research: str, out_file="script.md"):
-    """Generate a video script based on research."""
+def generate_script(topic: str, research: str, out_file: str) -> str:
     print(f"📝 Generating script for: {topic}")
-    
-    script = llm.invoke(script_prompt.format(topic=topic, research=research))
-    content = getattr(script, "content", str(script))
-    
-    if not content.strip():
-        raise ValueError("Script generation failed: Empty output")
-    
-    # Clean the content to remove section headers
-    cleaned_content = clean_script_content(content)
-    
-    Path(out_file).write_text(cleaned_content, encoding="utf-8")
-    print(f"✅ Script saved to: {out_file}")
+    response = llm.invoke(script_prompt.format(topic=topic, research=research))
+    content = getattr(response, "content", str(response))
+    Path(out_file).write_text(content, encoding="utf-8")
     return out_file
 
-# Step 3: Voice Generation
-def generate_voiceover(script_file="script.md", output_dir="voiceover", voice_name="rachel"):
-    """Generate a single continuous voiceover audio file from script."""
-    print(f"🎙️ Generating voiceover with voice: {voice_name}")
-    
-    # Read script
+def ensure_timestamps(script_file: str):
+    content = Path(script_file).read_text(encoding="utf-8").strip()
+    if re.search(r"\(\d+[-–]\d+ seconds\):", content):
+        return
+    sentences = [s.strip() for s in content.split('.') if s.strip()]
+    parts = ['. '.join(sentences[:len(sentences)//4]),
+             '. '.join(sentences[len(sentences)//4:len(sentences)//2]),
+             '. '.join(sentences[len(sentences)//2:3*len(sentences)//4]),
+             '. '.join(sentences[3*len(sentences)//4:])]
+    times = ["(0-5 seconds): ", "(6-15 seconds): ", "(16-25 seconds): ", "(26-30 seconds): "]
+    final_script = "\n".join(f"{t}{p}." for t, p in zip(times, parts) if p.strip())
+    Path(script_file).write_text(final_script, encoding="utf-8")
+    print(f"⏱️ Timestamps ensured in {script_file}")
+
+# =============================================================================
+# AUDIO GENERATION
+# =============================================================================
+
+def generate_voiceover(script_file: str, output_dir: str, voice_name: str = "rachel") -> str:
+    print(f"🎙️ Generating voiceover using {voice_name}")
     text = Path(script_file).read_text(encoding="utf-8")
-    
-    # Extract timestamped segments and combine into single narration
     pattern = r"\((\d+)[–-](\d+) seconds\):\s*(.+?)(?=\n\(|$)"
     matches = re.findall(pattern, text, re.DOTALL)
-    
     if not matches:
-        raise ValueError("No timestamped narration found in script.")
-    
-    # Clean matches to remove section headers and combine all narration
-    narration_parts = []
-    timestamp_map = []
-    
-    for start, end, content in matches:
-        # Remove section headers like "HOOK", "TENSION", "INSIGHT", "PAYOFF"
-        lines = content.strip().split('\n')
-        narration_lines = []
-        
-        for line in lines:
-            line = line.strip()
-            # Skip empty lines and section headers
-            if line and not line.isupper() and not line.endswith(':'):
-                narration_lines.append(line)
-        
-        # Join the narration lines for this segment
-        segment_narration = ' '.join(narration_lines)
-        if segment_narration:  # Only add if there's actual narration
-            narration_parts.append(segment_narration)
-            timestamp_map.append({
-                "start": int(start),
-                "end": int(end),
-                "duration": int(end) - int(start),
-                "text": segment_narration,
-                "word_count": len(segment_narration.split())
-            })
-    
-    # Combine all narration with natural pauses
-    full_narration = ' '.join(narration_parts)
-    
-    # Get voice ID
-    voice_id = get_voice_id(voice_name)
-    print(f"Using voice ID: {voice_id}")
-    print(f"📝 Full script: {full_narration[:100]}...")
-    
-    # Create output directory
-    output_dir = Path(output_dir)
-    output_dir.mkdir(exist_ok=True)
-    
+        raise ValueError("No timestamped narration found in script")
+    narration = ' '.join([' '.join(seg[2].strip().splitlines()) for seg in matches])
+    audio = generate(text=narration, voice=get_voice_id(voice_name), model="eleven_monolingual_v1")
+    out_dir = Path(output_dir)
+    out_dir.mkdir(exist_ok=True)
+    audio_file = out_dir / "voiceover.mp3"
+    with open(audio_file, "wb") as f:
+        f.write(audio)
+    print(f"✅ Audio saved: {audio_file}")
+    return str(audio_file)
+
+# =============================================================================
+# VIDEO CREATION (MoviePy v2 fixed)
+# =============================================================================
+
+def download_video(url: str, path: str) -> bool:
     try:
-        print("🔊 Generating single continuous audio file...")
-        
-        # Generate single audio file using the working approach
-        audio = generate(
-            text=full_narration,
-            voice=voice_id,
-            model="eleven_monolingual_v1"
+        r = requests.get(url, stream=True)
+        r.raise_for_status()
+        with open(path, "wb") as f:
+            for chunk in r.iter_content(8192):
+                f.write(chunk)
+        print(f"✅ Video downloaded: {path}")
+        return True
+    except Exception as e:
+        print(f"❌ Download failed: {e}")
+        return False
+
+def get_video_download_url(video: Dict, quality="hd") -> Optional[str]:
+    for f in video.get("video_files", []):
+        if f.get("quality") == quality:
+            return f.get("link")
+    return video.get("video_files", [{}])[0].get("link")
+
+def search_pexels_videos(query: str, per_page=5) -> List[Dict]:
+    try:
+        r = requests.get(
+            "https://api.pexels.com/videos/search",
+            headers={"Authorization": pexels_api_key},
+            params={"query": query, "per_page": per_page, "orientation": "landscape"}
         )
-        
-        # Save single audio file
-        audio_file = output_dir / "full_voiceover.mp3"
-        with open(audio_file, "wb") as f:
-            f.write(audio)
-        
-        print(f"✅ Saved: {audio_file}")
-        
-        # Save timeline data for reference
-        timeline_file = output_dir / "timeline.json"
-        timeline_data = {
-            "voice_name": voice_name,
-            "voice_id": voice_id,
-            "audio_file": str(audio_file),
-            "full_text": full_narration,
-            "total_words": len(full_narration.split()),
-            "total_duration": 30,
-            "segments_info": timestamp_map
-        }
-        
-        with open(timeline_file, "w", encoding="utf-8") as f:
-            json.dump(timeline_data, f, indent=2)
-        
-        print(f"✅ Timeline saved to: {timeline_file}")
-        print(f"🎉 Generated single audio file successfully!")
-        
-        return [str(audio_file)]  # Return as list to maintain compatibility
-        
-    except Exception as e:
-        print(f"❌ Failed to generate audio: {e}")
-        raise
+        r.raise_for_status()
+        data = r.json()
+        return data.get("videos", [])
+    except:
+        return []
 
-# Simple function to generate audio from any text
-def text_to_audio(text: str, output_file: str = "voiceover.mp3", voice_name: str = "rachel"):
-    """Generate audio directly from text."""
-    print(f"🎙️ Converting text to audio with voice: {voice_name}")
-    
-    voice_id = get_voice_id(voice_name)
-    print(f"Using voice ID: {voice_id}")
-    
+
+def create_final_video(video_path: str, audio_path: str, output_path: str) -> bool:
     try:
-        audio = generate(
-            text=text,
-            voice=voice_id,
-            model="eleven_monolingual_v1"
-        )
+        from moviepy import VideoFileClip, AudioFileClip, concatenate_videoclips
         
-        with open(output_file, "wb") as f:
-            f.write(audio)
+        print(f"🎬 Loading video: {video_path}")
+        v = VideoFileClip(video_path)
+        print(f"🎵 Loading audio: {audio_path}")
+        a = AudioFileClip(audio_path)
         
-        print(f"✅ Audio saved to: {output_file}")
-        return output_file
+        print(f"Video duration: {v.duration:.2f}s, Audio duration: {a.duration:.2f}s")
+
+        # If video is shorter than audio, loop it
+        if v.duration < a.duration:
+            loops = int(a.duration / v.duration) + 1
+            print(f"🔄 Looping video {loops} times to match audio duration")
+            looped = concatenate_videoclips([v] * loops)
+            # Use subclipped instead of subclip for modern MoviePy
+            v = looped.subclipped(0, a.duration)
+        else:
+            # Trim video to match audio duration
+            v = v.subclipped(0, a.duration)
+
+        # Set audio to video using with_audio
+        final_video = v.with_audio(a)
+        
+        print(f"🎥 Writing final video to: {output_path}")
+        final_video.write_videofile(output_path)
+        
+        print(f"✅ Final video created: {output_path}")
+        return True
         
     except Exception as e:
-        print(f"❌ Failed to generate audio: {e}")
-        raise
+        print(f"❌ Video creation failed: {e}")
+        print(f"Error details: {type(e).__name__}: {str(e)}")
+        return False
 
-# Full pipeline
-def generate_video(topic: str, voice_name="rachel", output_dir="output"):
-    """Complete pipeline to generate video content."""
-    print(f"\n🚀 Starting video generation for: '{topic}'")
-    print("=" * 60)
-    
-    # Create output directory
-    output_path = Path(output_dir)
-    output_path.mkdir(exist_ok=True)
-    
+
+# =============================================================================
+# MAIN PIPELINE
+# =============================================================================
+
+def generate_complete_video(topic: str, voice_name="rachel", output_dir="generated_video") -> Optional[str]:
+    output = Path(output_dir)
+    output.mkdir(exist_ok=True)
     try:
-        # Step 1: Research
-        research_file = output_path / "research.md"
-        research_text = researcher(topic, str(research_file))
-        
-        # Step 2: Script
-        script_file = output_path / "script.md"
-        generate_script(topic, research_text, str(script_file))
-        
-        # Step 3: Voiceover
-        voiceover_dir = output_path / "voiceover"
-        mp3_files = generate_voiceover(str(script_file), str(voiceover_dir), voice_name)
-        
-        # Summary
-        result = {
-            "topic": topic,
-            "research": str(research_file),
-            "script": str(script_file),
-            "voiceover_files": mp3_files,
-            "voiceover_directory": str(voiceover_dir),
-            "timeline": str(voiceover_dir / "timeline.json"),
-            "audio_file": mp3_files[0] if mp3_files else None  # Single file path
-        }
-        
-        print("\n" + "=" * 60)
-        print("🎉 VIDEO GENERATION COMPLETE!")
-        print("=" * 60)
-        print(f"📁 Output Directory: {output_dir}")
-        print(f"📄 Research File: {result['research']}")
-        print(f"📝 Script File: {result['script']}")
-        print(f"🎵 Audio File: {result['voiceover_files'][0]}")  # Single file now
-        print(f"📊 Timeline Data: {result['timeline']}")
-        print("=" * 60)
-        
-        return result
-        
+        research = research_topic(topic, str(output / "research.md"))
+        script_file = generate_script(topic, research, str(output / "script.md"))
+        ensure_timestamps(script_file)
+        audio_file = generate_voiceover(script_file, str(output / "audio"), voice_name)
+        videos = search_pexels_videos(topic)
+        if not videos:
+            videos = search_pexels_videos("business meeting")
+        if not videos:
+            return None
+        url = get_video_download_url(videos[0])
+        video_file = output / "background.mp4"
+        if not download_video(url, str(video_file)):
+            return None
+        final_file = output / "final_video.mp4"
+        if not create_final_video(str(video_file), audio_file, str(final_file)):
+            return None
+        print(f"🎉 Video ready at: {final_file}")
+        return str(final_file)
     except Exception as e:
-        print(f"\n❌ ERROR: {e}")
-        raise
-
-# Test available voices
-def test_voices():
-    """Test different voices to see which ones work."""
-    test_text = "Testing voice quality and clarity."
-    
-    print("🧪 Testing available voices...")
-    working_voices = []
-    
-    for voice_name, voice_id in VOICE_IDS.items():
-        try:
-            print(f"Testing {voice_name} ({voice_id})...")
-            audio = generate(
-                text=test_text,
-                voice=voice_id,
-                model="eleven_monolingual_v1"
-            )
-            
-            # Save test file
-            test_file = f"test_{voice_name}.mp3"
-            with open(test_file, "wb") as f:
-                f.write(audio)
-            
-            working_voices.append(voice_name)
-            print(f"✅ {voice_name} - Working! Saved as {test_file}")
-            
-        except Exception as e:
-            print(f"❌ {voice_name} - Failed: {e}")
-    
-    print(f"\n🎉 Working voices: {', '.join(working_voices)}")
-    return working_voices
-
-# Utility function to clean existing scripts
-def clean_existing_script(input_file: str, output_file: str = None):
-    """Clean an existing script file by removing section headers."""
-    if output_file is None:
-        output_file = input_file.replace('.md', '_cleaned.md')
-    
-    content = Path(input_file).read_text(encoding="utf-8")
-    cleaned_content = clean_script_content(content)
-    
-    Path(output_file).write_text(cleaned_content, encoding="utf-8")
-    print(f"✅ Cleaned script saved to: {output_file}")
-    return output_file
+        print(f"❌ Pipeline failed: {e}")
+        return None
 
 if __name__ == "__main__":
-    # Uncomment to test voices first
-    # test_voices()
-    
-    # Option 1: Generate complete video content
-    result = generate_video(
-        topic="How to Build a Go-To-Market Strategy",
-        voice_name="rachel",  # Try: rachel, domi, bella, antoni, etc.
-        output_dir="gtm_strategy_video"
-    )
-    
-    # Option 2: Generate audio from your own text
-    # text_to_audio(
-    #     text="Is your GTM strategy actually costing you millions? Delays mean rivals seize your market. You'll pay 2x, even 3x, more for customers. Hidden operational costs drain your budget. Win by leveraging proprietary data. Integrate AI for hyper-personalization. Align every team. Understand real customer shifts. Stop squandering resources. Build a winning GTM. Dominate your market.",
-    #     output_file="custom_voiceover.mp3",
-    #     voice_name="rachel"
-    # )
+    if not validate_setup():
+        exit(1)
+    final = generate_complete_video("How to Build a Go-To-Market Strategy", "rachel")
+    if not final:
+        print("❌ Video generation failed")
