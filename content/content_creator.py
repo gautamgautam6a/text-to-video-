@@ -1,102 +1,100 @@
 import os
-import requests
-from datetime import datetime
+import time
 from dotenv import load_dotenv
+from google import genai
+from google.genai import types
+from PIL import Image
+from io import BytesIO
 from langchain.prompts import PromptTemplate
-from langchain.agents import initialize_agent, Tool
 from langchain_google_genai import ChatGoogleGenerativeAI
-from prompts import LINKEDIN_PROMPT, TWITTER_PROMPT
+from datetime import datetime
+from prompts import LINKEDIN_PROMPT, TWITTER_PROMPT, RESEARCH_PROMPT
 
 load_dotenv()
 
-PEXELS_API_KEY = os.getenv("PEXELS_API_KEY")
-
-# Configure Gemini LLM
+# ----------- GEMINI CONFIG -----------
+# LLM for text
 llm_gemini = ChatGoogleGenerativeAI(
     model="gemini-1.5-flash",
     temperature=0.7,
     google_api_key=os.getenv("GEMINI_API_KEY")
 )
 
-# ----------- TOOLS -----------
+# Direct Gemini API for image
+#genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+
+# ----------- UTILITIES -----------
 
 def save_markdown(content: str, folder: str) -> str:
+    """Save text content into a timestamped markdown file."""
     os.makedirs(folder, exist_ok=True)
     filename = f"{folder}/{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.md"
     with open(filename, "w", encoding="utf-8") as f:
         f.write(content)
     return filename
 
-def get_pexels_image(query: str) -> str:
-    """Fetches first Pexels image for given query and saves locally."""
-    headers = {"Authorization": PEXELS_API_KEY}
-    response = requests.get(
-        f"https://api.pexels.com/v1/search?query={query}&per_page=1",
-        headers=headers
+def generate_gemini_image(topic: str):
+    """Generates a LinkedIn/Twitter style image from Gemini image model."""
+    client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+
+    response = client.models.generate_content(
+        model="gemini-2.0-flash-preview-image-generation",
+        contents=f"High-quality, professional social-media-ready image about: {topic}",
+        config=types.GenerateContentConfig(
+            response_modalities=['TEXT', 'IMAGE']
+        )
     )
-    data = response.json()
-    if not data.get("photos"):
-        raise ValueError("No images found on Pexels for the given query.")
-    
-    image_url = data["photos"][0]["src"]["large"]
-    os.makedirs("linkedin_assets", exist_ok=True)
-    filename = f"linkedin_assets/{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.jpg"
-    img_data = requests.get(image_url).content
-    with open(filename, "wb") as handler:
-        handler.write(img_data)
-    return filename
+
+    image_path = None
+    for part in response.candidates[0].content.parts:
+        if part.inline_data:
+            image = Image.open(BytesIO(part.inline_data.data))
+            os.makedirs("generated_images", exist_ok=True)
+
+            # sanitize filename (remove ? and other illegal chars)
+            safe_topic = "".join(c if c.isalnum() or c in ("_", "-") else "_" for c in topic)
+            image_path = f"generated_images/{safe_topic}_{int(time.time())}.png"
+
+            image.save(image_path)
+            print(f"✅ Image saved at: {image_path}")
+
+    if not image_path:
+        print("⚠ No image data found in response.")
+
+    return image_path
 
 # ----------- AGENTS -----------
 
+def research_agent():
+    """Research trending topic for predefined business niche using Gemini."""
+    prompt_template = PromptTemplate(input_variables=[], template=RESEARCH_PROMPT)
+
+    response = llm_gemini.invoke(prompt_template.format())
+    topic_text = response.content if hasattr(response, "content") else str(response)
+
+    return topic_text
+
+
 def linkedin_agent(topic: str):
+    """Generate LinkedIn post + image for given topic."""
     prompt_template = PromptTemplate(input_variables=["topic"], template=LINKEDIN_PROMPT)
 
-    tools = [
-        Tool(
-            name="Save LinkedIn Post",
-            func=lambda text: save_markdown(text, "linkedin_posts"),
-            description="Save the LinkedIn post to a markdown file"
-        ),
-        Tool(
-            name="Get LinkedIn Image",
-            func=lambda text: get_pexels_image(text),
-            description="Search and download a relevant LinkedIn image from Pexels"
-        )
-    ]
+    linkedin_post = llm_gemini.invoke(prompt_template.format(topic=topic))
+    linkedin_post_text = linkedin_post.content if hasattr(linkedin_post, "content") else str(linkedin_post)
 
-    agent = initialize_agent(
-        tools,
-        llm_gemini,
-        agent="zero-shot-react-description",
-        verbose=True
-    )
+    md_path = save_markdown(linkedin_post_text, "linkedin_posts")
+    image_path = generate_gemini_image(topic)
 
-    linkedin_post = llm_gemini.predict(prompt_template.format(topic=topic))
-    md_path = save_markdown(linkedin_post, "linkedin_posts")
-    image_path = get_pexels_image(topic)
-
-    return linkedin_post, md_path, image_path
+    return linkedin_post_text, md_path, image_path
 
 
 def twitter_agent(topic: str):
+    """Generate Twitter post for given topic."""
     prompt_template = PromptTemplate(input_variables=["topic"], template=TWITTER_PROMPT)
 
-    tools = [
-        Tool(
-            name="Save Twitter Post",
-            func=lambda text: save_markdown(text, "twitter_posts"),
-            description="Save the Twitter post to a markdown file"
-        )
-    ]
+    twitter_post = llm_gemini.invoke(prompt_template.format(topic=topic))
+    twitter_post_text = twitter_post.content if hasattr(twitter_post, "content") else str(twitter_post)
 
-    agent = initialize_agent(
-        tools,
-        llm_gemini,
-        agent="zero-shot-react-description",
-        verbose=True
-    )
+    md_path = save_markdown(twitter_post_text, "twitter_posts")
 
-    twitter_post = llm_gemini.predict(prompt_template.format(topic=topic))
-    md_path = save_markdown(twitter_post, "twitter_posts")
-
-    return twitter_post, md_path
+    return twitter_post_text, md_path
