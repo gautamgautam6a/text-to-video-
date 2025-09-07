@@ -1,5 +1,6 @@
 import os
 import time
+import json
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
@@ -16,7 +17,7 @@ load_dotenv()
 # LLM for text
 llm_gemini = ChatGoogleGenerativeAI(
     model="gemini-1.5-flash",
-    temperature=0.7,
+    temperature=0.9,
     google_api_key=os.getenv("GEMINI_API_KEY")
 )
 
@@ -66,13 +67,49 @@ def generate_gemini_image(topic: str):
 # ----------- AGENTS -----------
 
 def research_agent():
-    """Research trending topic for predefined business niche using Gemini."""
-    prompt_template = PromptTemplate(input_variables=[], template=RESEARCH_PROMPT)
+    """Research trending topic for predefined business niche using Gemini, avoiding repeats."""
+    topics_file = "topics.json"
 
+    # Load existing topics
+    if os.path.exists(topics_file):
+        with open(topics_file, "r", encoding="utf-8") as f:
+            try:
+                topics_data = json.load(f)
+            except json.JSONDecodeError:
+                topics_data = []
+    else:
+        topics_data = []
+
+    used_topics = [t["topic"] for t in topics_data]
+
+    # Build dynamic prompt with exclusions
+    today = datetime.now().strftime("%Y-%m-%d")
+    exclusion_text = "\n".join(f"- {t}" for t in used_topics) if used_topics else "None yet"
+
+    dynamic_prompt = RESEARCH_PROMPT + f"""
+
+🚫 Do NOT return any of these already-used topics:
+{exclusion_text}
+
+📅 Today’s date: {today}
+"""
+
+    # Run Gemini
+    prompt_template = PromptTemplate(input_variables=[], template=dynamic_prompt)
     response = llm_gemini.invoke(prompt_template.format())
-    topic_text = response.content if hasattr(response, "content") else str(response)
+    topic_text = response.content.strip() if hasattr(response, "content") else str(response).strip()
+
+    # Save if unique
+    if topic_text not in used_topics:
+        topics_data.append({
+            "topic": topic_text,
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        })
+        with open(topics_file, "w", encoding="utf-8") as f:
+            json.dump(topics_data, f, indent=4)
 
     return topic_text
+
 
 
 def linkedin_agent(topic: str):
