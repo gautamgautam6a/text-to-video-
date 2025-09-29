@@ -1,0 +1,46 @@
+{
+    "industry": "B2B SaaS (Go-to-Market, Martech, Devtools, AI, Product Analytics, RevOps)",
+    "target_audience": [
+        "Founders",
+        "GTM Leaders",
+        "Sales Leaders"
+    ],
+    "customer_pain_points": [
+        {
+            "challenge": "Ineffective traditional GTM strategies",
+            "why": "Old methods relying on brute-force hiring, generic playbooks, manual RevOps, and outsourced services are failing in the modern SaaS environment."
+        },
+        {
+            "challenge": "Lack of actionable intelligence from GTM tools",
+            "why": "Existing GTM tools (e.g., Gong, Fireflies, Apollo) generate vast amounts of data but do not provide integrated insights or solutions to act upon it."
+        },
+        {
+            "challenge": "Difficulty operationalizing GTM advice",
+            "why": "Founders and teams receive GTM ideas from advisors or influencers but struggle to implement them effectively or at scale within their operations."
+        },
+        {
+            "challenge": "Fragmented GTM support",
+            "why": "Various service providers (SDR agencies, RevOps consultants, copywriters, sales coaches) offer siloed solutions that don't integrate into a cohesive, intelligent system for GTM execution."
+        }
+    ],
+    "customer_needs": [
+        {
+            "outcome": "A unified system to optimize GTM execution",
+            "how_our_company_exists_in_this": "KLYRR provides a high-context, insight-layer system designed to decode, rewire, and execute revenue-first GTM strategies."
+        },
+        {
+            "outcome": "Actionable intelligence from existing GTM data",
+            "how_our_company_exists_in_this": "KLYRR integrates with current GTM tools to interpret and act on underleveraged data, transforming it into intelligence."
+        },
+        {
+            "outcome": "Scalable and integrated GTM support",
+            "how_our_company_exists_in_this": "KLYRR offers a systemic approach that rewires GTM across conversations, assets, and behavior, moving beyond fragmented service vendor solutions."
+        },
+        {
+            "outcome": "Improved GTM performance and revenue generation",
+            "how_our_company_exists_in_this": "KLYRR focuses on high-leverage GTM behaviors and performance-critical content optimization within its comprehensive system."
+        }
+    ],
+    "value_proposition": "KLYRR provides an intelligent system that decodes GTM data, rewires execution across all touchpoints, and drives revenue for early-stage B2B SaaS companies by closing critical system gaps.",
+    "brand_tone": "Strategic, Authoritative, Direct, Thought-leadership"
+}
