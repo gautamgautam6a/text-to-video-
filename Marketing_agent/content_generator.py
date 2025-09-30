@@ -11,7 +11,7 @@ load_dotenv()
 TOPICS_FILE = "./topics/topics.json"
 NEWS_FILE = "./news/filtered_news.json"
 NICHE_FILE = "./niche/niche_icp.json"
-OUTPUT_FILE = "./content/generated_content.json"
+OUTPUT_DIR = "./content/generated_content"
 VECTOR_DB_DIR = "./vectordb"
 
 
@@ -55,16 +55,36 @@ class ContentGenerator:
             match = re.search(r"\{.*\}", response, re.S)
             return json.loads(match.group()) if match else {}
 
+    def _format_pain_points(self, niche):
+        # Extract nested pain point details
+        pain_points_list = []
+        for item in niche.get('customer_pain_points', []):
+            challenge = item.get('challenge', '')
+            why_details = item.get('why', [])
+            explanations = []
+            for w in why_details:
+                cause = w.get('cause', '')
+                explanation = w.get('explanation', '')
+                indicators = "; ".join(w.get('indicators', []))
+                explanations.append(f"Cause: {cause}, Explanation: {explanation}, Indicators: {indicators}")
+            full_detail = f"{challenge} [{' | '.join(explanations)}]"
+            pain_points_list.append(full_detail)
+        return "\n- ".join(pain_points_list)
+
+    def _format_needs(self, niche):
+        return ', '.join([item['need'] for item in niche.get('customer_needs', [])])
+
     def generate_linkedin_content(self, topic, related_news, niche, audience, tone, pdf_context):
-        pain_points_str = ', '.join([item['challenge'] for item in niche.get('customer_pain_points', [])])
-        needs_str = ', '.join([item['need'] for item in niche.get('customer_needs', [])])
+        pain_points_str = self._format_pain_points(niche)
+        needs_str = self._format_needs(niche)
 
         prompt = f"""
         Create a LinkedIn post about the topic: "{topic['title']}".
 
         Context:
         - Industry: {niche.get("industry")}
-        - Pain Points: {pain_points_str}
+        - Pain Points (with causes, explanations, indicators):
+        - {pain_points_str}
         - Needs: {needs_str}
         - Target Audience: {audience}
         - Desired Tone: {tone}
@@ -88,8 +108,9 @@ class ContentGenerator:
         return self.clean_response(response).get("linkedin", {})
 
     def generate_twitter_content(self, topic, related_news, niche, audience, tone, pdf_context):
-        pain_points_str = ', '.join([item['challenge'] for item in niche.get('customer_pain_points', [])])
-        needs_str = ', '.join([item['need'] for item in niche.get('customer_needs', [])])
+        # For Twitter, include only challenges to fit character limit
+        pain_points_str = ', '.join([item.get('challenge', '') for item in niche.get('customer_pain_points', [])])
+        needs_str = self._format_needs(niche)
 
         prompt = f"""
         Create a Twitter (X) post about the topic: "{topic['title']}".
@@ -120,15 +141,16 @@ class ContentGenerator:
         return self.clean_response(response).get("twitter", {})
 
     def generate_youtube_content(self, topic, related_news, niche, audience, tone, pdf_context):
-        pain_points_str = ', '.join([item['challenge'] for item in niche.get('customer_pain_points', [])])
-        needs_str = ', '.join([item['need'] for item in niche.get('customer_needs', [])])
+        pain_points_str = self._format_pain_points(niche)
+        needs_str = self._format_needs(niche)
 
         prompt = f"""
         Create a YouTube video script intro and description for the topic: "{topic['title']}".
 
         Context:
         - Industry: {niche.get("industry")}
-        - Pain Points: {pain_points_str}
+        - Pain Points (with causes, explanations, indicators):
+        - {pain_points_str}
         - Needs: {needs_str}
         - Target Audience: {audience}
         - Desired Tone: {tone}
@@ -159,19 +181,28 @@ class ContentGenerator:
         twitter_post = self.generate_twitter_content(topic, related_news, niche, audience, tone, pdf_context)
         youtube_post = self.generate_youtube_content(topic, related_news, niche, audience, tone, pdf_context)
 
-        result = {
-            "topic": topic,
-            "linkedin": linkedin_post,
-            "twitter": twitter_post,
-            "youtube": youtube_post
-        }
+        os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-        os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
-        with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-            json.dump(result, f, indent=4, ensure_ascii=False)
+        # Save separate JSON files
+        linkedin_file = os.path.join(OUTPUT_DIR, "linkedin.json")
+        twitter_file = os.path.join(OUTPUT_DIR, "twitter.json")
+        youtube_file = os.path.join(OUTPUT_DIR, "youtube.json")
 
-        print("✅ Content generated and saved to", OUTPUT_FILE)
-        return result
+        with open(linkedin_file, "w", encoding="utf-8") as f:
+            json.dump({"topic": topic, "linkedin": linkedin_post}, f, indent=4, ensure_ascii=False)
+
+        with open(twitter_file, "w", encoding="utf-8") as f:
+            json.dump({"topic": topic, "twitter": twitter_post}, f, indent=4, ensure_ascii=False)
+
+        with open(youtube_file, "w", encoding="utf-8") as f:
+            json.dump({"topic": topic, "youtube": youtube_post}, f, indent=4, ensure_ascii=False)
+
+        print("✅ Content generated and saved:")
+        print("  -", linkedin_file)
+        print("  -", twitter_file)
+        print("  -", youtube_file)
+
+        return linkedin_post, twitter_post, youtube_post
 
 
 def main():

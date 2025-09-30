@@ -1,7 +1,7 @@
 {
     "topic": {
-        "id": 3,
-        "title": "Adapt GTM to Win the Modern AI-Driven B2B Buyer",
+        "id": 1,
+        "title": "Mastering AI-Driven GTM for B2B SaaS Growth",
         "related_news": [
             {
                 "title": "How to build a GTM strategy that actually drives results at Disrupt 2025",
@@ -50,37 +50,12 @@
             }
         ]
     },
-    "linkedin": {
-        "caption": "The modern B2B buyer is AI-driven. Is your Go-To-Market strategy adapted to win them?\n\nCXOs, you're likely overwhelmed by GTM data, yet starved for actionable insights. Generic messaging fails to resonate. SDR/AE ramp-up is prolonged, performance inconsistent, and sales forecasts remain unreliable. This isn't a talent problem; it's a systemic one.\n\nAI has accelerated creation, but simultaneously exposed a critical bottleneck: the lack of robust systems for *interpretation, prioritization, and systemization* of GTM efforts. More tools alone won't solve this.\n\nWe transform raw GTM data, particularly conversation transcripts, into precise, psychologically impactful messaging and behavior-changing insights. This isn't about static enablement; it's about rewiring your GTM execution across conversations, assets, and behavior.\n\nThe result? Accelerated SDR/AE ramp-up (40-60% faster), consistent high performance, and accurate, confident sales forecasting. Move beyond guesswork. Establish a GTM system that actually converts.",
-        "hashtags": [
-            "#B2BSaaS",
-            "#GoToMarket",
-            "#AIDrivenBuyer",
-            "#RevenueOperations",
-            "#SalesStrategy",
-            "#GTMStrategy",
-            "#CXO"
-        ]
-    },
     "twitter": {
-        "tweet": "GTM overwhelmed by AI-driven B2B buyers? Generic messaging, slow rep ramp-up, inaccurate forecasts cost you. We transform conversation data into actionable GTM intelligence, rewiring behavior for predictable revenue. #B2BSaaS #GTMStrategy #AI",
+        "tweet": "B2B SaaS founders, overwhelmed by GTM chaos? AI-driven insights from conversation data can fix inconsistent rep performance, slow ramp-up, & fuzzy forecasts. It's time to rewire your growth engine for predictable revenue. #B2BSaaS #AIGTM #SaaSGrowth",
         "hashtags": [
             "#B2BSaaS",
-            "#GTMStrategy",
-            "#AI"
-        ]
-    },
-    "youtube": {
-        "script_intro": "CXOs, your Go-To-Market strategy is falling behind. You're overwhelmed by data, yet lack actionable intelligence. Your messaging is generic, and your sales forecasts are unreliable. The modern B2B buyer, now AI-empowered, demands more than just another sales tool or coaching session. This isn't about incremental fixes; it's about fundamentally rewiring your GTM execution. We'll show you how to leverage conversation data, build psychologically impactful messaging, and create a scalable system that drives predictable revenue and consistently wins the AI-driven buyer. Stop settling for inefficiency. It's time to adapt, or be left behind.",
-        "description": "The AI revolution has fundamentally shifted the B2B buyer landscape, rendering traditional GTM strategies obsolete. This video delivers a direct roadmap for CXOs to transform fragmented GTM data into actionable intelligence, develop psychologically impactful messaging, and establish a scalable system that rewires execution to consistently win the modern, AI-driven B2B buyer.",
-        "tags": [
-            "GTM Strategy",
-            "B2B SaaS",
-            "AI in Sales",
-            "Go-to-Market",
-            "Revenue Growth",
-            "Sales Enablement",
-            "Buyer Behavior"
+            "#AIGTM",
+            "#SaaSGrowth"
         ]
     }
 }
